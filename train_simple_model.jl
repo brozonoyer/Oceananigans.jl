@@ -7,7 +7,7 @@ using Flux.Losses: logitcrossentropy
 using Base: @kwdef
 using CUDA
 using MLDatasets
-using BSON: @save
+using BSON: @save, @load
 
 
 @kwdef mutable struct Args
@@ -15,7 +15,9 @@ using BSON: @save
     batchsize::Int = 1    ## batch size
     epochs::Int = 10        ## number of epochs
     use_cuda::Bool = false   ## use gpu (if cuda available)
-    data::String = "/nfs/raid66/u11/users/brozonoy-ad/Oceananigans.jl/tdata.jld2"      ## path to jld2 data file
+    data::String = "/nfs/nimble/users/brozonoy/Oceananigans.jl/tdata.jld2"      ## path to jld2 data file
+    fourier::Bool = false  # train model in fourier space
+    decode::Bool = false  # do inference rather than training
 end
 
 
@@ -23,15 +25,32 @@ function getdata(args)
 
     data = load(args.data)
 
-    X, y = [], []
-    for (timestep, timestep_data) in data
-        push!(X, timestep_data[timestep]["rhs"])  # shape 3600
-        push!(y, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-    end
-    ## Create DataLoader object (mini-batch iterator)
-    train_loader = DataLoader((X, y), batchsize=args.batchsize, shuffle=true)
+    X = []
+    # if !args.decode
+    y = []
+    # end
 
-    return train_loader
+    for (timestep, timestep_data) in data
+        if args.fourier
+            push!(X, fft(timestep_data[timestep]["rhs"]))  # shape 3600
+            # if !args.decode
+            push!(y, fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            # end
+        else
+            push!(X, timestep_data[timestep]["rhs"])  # shape 3600
+            # if !args.decode
+            push!(y, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            # end
+        end
+    end
+    
+    ## Create DataLoader object (mini-batch iterator)
+    if args.decode
+        loader = DataLoader((X, y), batchsize=args.batchsize, shuffle=false)
+    else
+        loader = DataLoader((X, y), batchsize=args.batchsize, shuffle=true)
+    end
+    return loader
 end
 
 
@@ -83,7 +102,7 @@ function train(; kws...)
         device = cpu
     end
 
-    ## Create test and train dataloaders
+    ## Create train dataloader
     train_loader = getdata(args)
 
     ## Construct model
@@ -111,6 +130,37 @@ function train(; kws...)
 end
 
 
+function decode(model; kws...)
+    
+    args = Args(; kws...) ## Collect options in a struct for convenience
+
+    if CUDA.functional() && args.use_cuda
+        @info "Decoding on CUDA GPU"
+        CUDA.allowscalar(false)
+        device = gpu
+    else
+        @info "Decoding on CPU"
+        device = cpu
+    end
+
+    ## Create test dataloader
+    test_loader = getdata(args)
+
+    Ŷ = []
+    for (x, y) in test_loader
+        x = device(x[1])
+        ŷ = model(x)
+        if args.fourier
+            push!(Ŷ, ifft(ŷ))
+        else
+            push!(Ŷ, ŷ)
+        end
+    end
+
+    return Ŷ
+end
+
+
 function parse_commandline()
 
     s = ArgParseSettings()
@@ -124,6 +174,12 @@ function parse_commandline()
             help = "path to save model"
             arg_type = String
             required = true
+        "--decode", "-d"
+            help = "do inference rather than training"
+            action = :store_true
+        "--fourier", "-f"
+            help = "whether to train model in fourier space"
+            action = :store_true
     end
 
     return parse_args(s)
@@ -133,7 +189,12 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     parsed_args = parse_commandline()
-    trained_model = train(; data=parsed_args["data"])
-    @save parsed_args["model"] trained_model
+    if parsed_args["decode"]
+        @load parsed_args["model"] model
+        decode(model;  data=parsed_args["data"], fourier=parsed_args["fourier"])
+    else
+        model = train(; data=parsed_args["data"], fourier=parsed_args["fourier"])
+        @save parsed_args["model"] model
+    end
 
 end
