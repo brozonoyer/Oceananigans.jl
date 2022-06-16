@@ -59,36 +59,33 @@ function VectorPolarFromCartesian(Vcartesian)
 end
 
 
+function VectorCartesianFromPolar(VR, VΘ)
+    Vcartesian = map(tup->CartesianFromPolar()([tup[1], tup[2]]), ZippedArray(VR, VΘ))
+    return Vcartesian
+end
+
+
 function MLP(; inputsize=(3600,1))
     return Chain( Dense(prod(inputsize), 256, relu),
                 Dense(256, 62*62))
 end
 
 
-# function LeNet5(; imgsize=(62,62,1), nclasses=) 
-#     out_conv_size = (imgsize[1]÷4 - 3, imgsize[2]÷4 - 3, 16)
-    
-#     return Chain(
-#             Conv((5, 5), imgsize[end]=>6, relu),
-#             MaxPool((2, 2)),
-#             Conv((5, 5), 6=>16, relu),
-#             MaxPool((2, 2)),
-#             flatten,
-#             Dense(prod(out_conv_size), 120, relu), 
-#             Dense(120, 84, relu), 
-#             Dense(84, nclasses)
-#           )
-# end
-
-
-function loss(data_loader, model, device)
+function loss(data_loader, model, device; fourier=false)
     ls = 0.0f0
     num = 0
     for (x, y) in data_loader
-        x, y = device(x[1]), device(y[1])
-        ŷ = model(x)
-        ls += logitcrossentropy(ŷ, y, agg=sum)
-        num +=  size(x)[end]
+        if !fourier
+            x, y = device(x[1]), device(y[1])
+            ŷ = model(x)
+            ls += logitcrossentropy(ŷ, y, agg=sum)
+            num +=  size(x)[end]
+        else
+            Rx, Θx, Ry, Θy = device(x[1][1]), device(x[1][2]), device(y[1][1]), device(y[1][2])
+            Rŷ, Θŷ = model(Rx), model(Θx)
+            ls += (logitcrossentropy(Rŷ, Ry, agg=sum) + logitcrossentropy(Θŷ, Θy, agg=sum))
+            num +=  2*size(Rx)[end]
+        end
     end
     return ls / num
 end
@@ -123,12 +120,14 @@ function train(; kws...)
             if !args.fourier
                 x, y = device(x[1]), device(y[1]) ## transfer data to device
                 gs = gradient(() -> logitcrossentropy(model(x), y), ps) ## compute gradient
-                Flux.Optimise.update!(opt, ps, gs) ## update parameters
-
+            else
+                Rx, Θx, Ry, Θy = device(x[1][1]), device(x[1][2]), device(y[1][1]), device(y[1][2])
+                gs = gradient(() -> logitcrossentropy(model(Rx), Ry) + logitcrossentropy(model(Θx), Θy), ps) ## compute gradient
+            end
+            Flux.Optimise.update!(opt, ps, gs) ## update parameters
         end
-        
         ## Report on train and test
-        train_loss = loss(train_loader, model, device)
+        train_loss = loss(train_loader, model, device; fourier=args.fourier)
         println("Epoch=$epoch")
         println("  train_loss = $train_loss")
     end
@@ -155,10 +154,10 @@ function decode(model; kws...)
 
     Ŷ = []
     for (x, y) in test_loader
-        x = device(x[1])
-        ŷ = model(x)
         if args.fourier
-            push!(Ŷ, ifft(ŷ))
+            Rx, Θx = device(x[1][1]), device(x[1][2])
+            Rŷ, Θŷ = model(Rx), model(Θx)
+            push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
             push!(Ŷ, ŷ)
         end
@@ -185,7 +184,7 @@ function parse_commandline()
             help = "do inference rather than training"
             action = :store_true
         "--fourier", "-f"
-            help = "whether to train model in fourier space"
+            help = "whether model trains/decodes in fourier space"
             action = :store_true
     end
 
