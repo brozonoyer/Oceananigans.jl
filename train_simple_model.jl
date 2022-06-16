@@ -4,6 +4,9 @@ using Flux, Statistics
 using Flux.Data: DataLoader
 using Flux: onehotbatch, onecold, @epochs
 using Flux.Losses: logitcrossentropy
+using FFTW
+using CoordinateTransformations
+using ZippedArrays
 using Base: @kwdef
 using CUDA
 using MLDatasets
@@ -26,21 +29,16 @@ function getdata(args)
     data = load(args.data)
 
     X = []
-    # if !args.decode
     y = []
-    # end
-
     for (timestep, timestep_data) in data
         if args.fourier
-            push!(X, fft(timestep_data[timestep]["rhs"]))  # shape 3600
-            # if !args.decode
-            push!(y, fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-            # end
+            RX, ΘX =  VectorPolarFromCartesian(fft(timestep_data[timestep]["rhs"]))  # shape 3600
+            push!(X, (RX, ΘX))
+            Ry, Θy = VectorPolarFromCartesian(fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))  # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            push!(y, (Ry, Θy))
         else
             push!(X, timestep_data[timestep]["rhs"])  # shape 3600
-            # if !args.decode
             push!(y, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-            # end
         end
     end
     
@@ -51,6 +49,13 @@ function getdata(args)
         loader = DataLoader((X, y), batchsize=args.batchsize, shuffle=true)
     end
     return loader
+end
+
+
+function VectorPolarFromCartesian(Vcartesian)
+    Vpolar = map(tup->PolarFromCartesian()([tup[1], tup[2]]), ZippedArray(real.(Vcartesian), imag.(Vcartesian)))
+    R, Θ = map(n->n.r, Vpolar), map(n->n.θ, Vpolar)
+    return R, Θ
 end
 
 
@@ -115,9 +120,11 @@ function train(; kws...)
     ## Training
     for epoch in 1:args.epochs
         for (x, y) in train_loader
-            x, y = device(x[1]), device(y[1]) ## transfer data to device
-            gs = gradient(() -> logitcrossentropy(model(x), y), ps) ## compute gradient
-            Flux.Optimise.update!(opt, ps, gs) ## update parameters
+            if !args.fourier
+                x, y = device(x[1]), device(y[1]) ## transfer data to device
+                gs = gradient(() -> logitcrossentropy(model(x), y), ps) ## compute gradient
+                Flux.Optimise.update!(opt, ps, gs) ## update parameters
+
         end
         
         ## Report on train and test
