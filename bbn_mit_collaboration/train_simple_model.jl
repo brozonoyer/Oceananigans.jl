@@ -168,6 +168,7 @@ function decode(model_path; kws...)
             Rŷ, Θŷ = model(Rx), model(Θx)
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
+	    ŷ = model(x)
             push!(Ŷ, ŷ)
         end
     end
