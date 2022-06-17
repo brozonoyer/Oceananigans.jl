@@ -166,8 +166,6 @@ function decode(model_path; kws...)
         if args.fourier
             Rx, Θx = device(x[1][1]), device(x[1][2])
             Rŷ, Θŷ = model(Rx), model(Θx)
-	    println(typeof(VectorCartesianFromPolar(Rŷ, Θŷ)))
-	    println(size(VectorCartesianFromPolar(Rŷ, Θŷ)))
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
             push!(Ŷ, ŷ)
