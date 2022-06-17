@@ -61,7 +61,7 @@ function visualize_barotropic_gyre(filepath)
     statenames = ["u", "v", "η"]
     for (n, var) in enumerate([u, v, η])
         ax = fig[3:7, 3n-2:3n] = LScene(fig) # make plot area wider
-        wireframe!(ax, Sphere(Point3f(0), 0.99f0), show_axis=false)
+        wireframe!(ax, Sphere(Point3f(0), 0.99f0))
         surface!(ax, x[n], y[n], z[n], color=var, colormap=:balance) #, colorrange=clims[n])
         rotate_cam!(ax.scene, (0, 3π/4, 0))
         fig[2, 2 + 3*(n-1)] = Label(fig, statenames[n], textsize = 50) # put names in center
@@ -89,6 +89,6 @@ Nx = 60
 Ny = 60
 
 output_prefix = "barotropic_gyre_Nx$(Nx)_Ny$(Ny)"
-filepath = output_prefix * ".jld2"
+filepath = "/Users/pmuthuku/toolkits/Oceananigans.jl/validation/barotropic_gyre/" * output_prefix * ".jld2"
 
 visualize_barotropic_gyre(filepath)
