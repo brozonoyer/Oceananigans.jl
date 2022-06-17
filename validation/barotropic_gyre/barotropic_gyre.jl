@@ -29,7 +29,7 @@ Nx = 60
 Ny = 60
 
 # A spherical domain
-underlying_grid = LatitudeLongitudeGrid(size = (Nx, Ny, 1),
+underlying_grid = LatitudeLongitudeGrid(GPU(), size = (Nx, Ny, 1),
                                         longitude = (-30, 30),
                                         latitude = (15, 75),
                                         z = (-4000, 0))
@@ -117,8 +117,8 @@ end
 
 simulation = Simulation(model,
                         Δt = 3600,
-                        stop_time = 1day)
-#                       stop_time = 1years)
+#                        stop_time = 1day)
+                       stop_time = 1years)
 
 simulation.callbacks[:progress] = Callback(Progress(time_ns()), IterationInterval(20))
 
@@ -139,6 +139,6 @@ run!(simulation)
 ##### Animation!
 #####
 
-include("visualize_barotropic_gyre.jl")
+#include("visualize_barotropic_gyre.jl")
 
 # visualize_barotropic_gyre(simulation.output_writers[:fields])
