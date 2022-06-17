@@ -152,10 +152,7 @@ function decode(model_path; kws...)
     end
 
     model = MLP() |> device
-    #println(model_path) 
-    #println(@load(model_path))
     weights = BSON.load(model_path)
-    println(weights)
     model = Flux.loadmodel!(model, weights[:model])
 
     ## Create test dataloader
@@ -168,7 +165,7 @@ function decode(model_path; kws...)
             Rŷ, Θŷ = model(Rx), model(Θx)
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
-	    ŷ = model(x)
+	    ŷ = model(device(x[1]))
             push!(Ŷ, ŷ)
         end
     end
