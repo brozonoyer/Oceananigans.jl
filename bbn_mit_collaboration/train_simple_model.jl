@@ -16,8 +16,8 @@ using BSON: @save, @load
 @kwdef mutable struct Args
     η::Float64 = 3e-4       ## learning rate
     batchsize::Int = 1    ## batch size
-    epochs::Int = 10        ## number of epochs
-    use_cuda::Bool = false   ## use gpu (if cuda available)
+    epochs::Int = 50        ## number of epochs
+    use_cuda::Bool = true   ## use gpu (if cuda available)
     data::String = "/nfs/nimble/users/brozonoy/Oceananigans.jl/tdata.jld2"      ## path to jld2 data file
     fourier::Bool = false  # train model in fourier space
     decode::Bool = false  # do inference rather than training
@@ -60,8 +60,10 @@ end
 
 
 function VectorCartesianFromPolar(VR, VΘ)
-    Vcartesian = map(tup->CartesianFromPolar()([tup[1], tup[2]]), ZippedArray(VR, VΘ))
-    return Vcartesian
+    CUDA.allowscalar() do
+        #return CartesianFromPolar().(map(tup->Polar(tup[1], tup[2]), ZippedArray(VR, VΘ)))
+        return map(tup->Polar(tup[1], tup[2]), ZippedArray(VR, VΘ))
+    end
 end
 
 
@@ -157,6 +159,13 @@ function decode(model; kws...)
         if args.fourier
             Rx, Θx = device(x[1][1]), device(x[1][2])
             Rŷ, Θŷ = model(Rx), model(Θx)
+            println(Rx)
+            println(Θx)
+            println(Rŷ)
+            println(Θŷ)
+            println(Flux.params(model))
+	    #println(typeof(VectorCartesianFromPolar(Rŷ, Θŷ)))
+	    #println(VectorCartesianFromPolar(Rŷ, Θŷ))
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
             push!(Ŷ, ŷ)
