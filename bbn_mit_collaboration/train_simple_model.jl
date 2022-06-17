@@ -10,6 +10,7 @@ using ZippedArrays
 using Base: @kwdef
 using CUDA
 using MLDatasets
+using BSON
 using BSON: @save, @load
 
 
@@ -61,8 +62,7 @@ end
 
 function VectorCartesianFromPolar(VR, VΘ)
     CUDA.allowscalar() do
-        #return CartesianFromPolar().(map(tup->Polar(tup[1], tup[2]), ZippedArray(VR, VΘ)))
-        return map(tup->Polar(tup[1], tup[2]), ZippedArray(VR, VΘ))
+        return map(tup->tup[1]+tup[2]im, CartesianFromPolar().(map(tup->Polar(tup[1], tup[2]), ZippedArray(VR, VΘ))))
     end
 end
 
@@ -134,11 +134,11 @@ function train(; kws...)
         println("  train_loss = $train_loss")
     end
 
-    return model
+    return cpu(model)
 end
 
 
-function decode(model; kws...)
+function decode(model_path; kws...)
     
     args = Args(; kws...) ## Collect options in a struct for convenience
 
@@ -151,6 +151,13 @@ function decode(model; kws...)
         device = cpu
     end
 
+    model = MLP() |> device
+    #println(model_path) 
+    #println(@load(model_path))
+    weights = BSON.load(model_path)
+    println(weights)
+    model = Flux.loadmodel!(model, weights[:model])
+
     ## Create test dataloader
     test_loader = getdata(args)
 
@@ -159,13 +166,8 @@ function decode(model; kws...)
         if args.fourier
             Rx, Θx = device(x[1][1]), device(x[1][2])
             Rŷ, Θŷ = model(Rx), model(Θx)
-            println(Rx)
-            println(Θx)
-            println(Rŷ)
-            println(Θŷ)
-            println(Flux.params(model))
-	    #println(typeof(VectorCartesianFromPolar(Rŷ, Θŷ)))
-	    #println(VectorCartesianFromPolar(Rŷ, Θŷ))
+	    println(typeof(VectorCartesianFromPolar(Rŷ, Θŷ)))
+	    println(size(VectorCartesianFromPolar(Rŷ, Θŷ)))
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
             push!(Ŷ, ŷ)
@@ -205,8 +207,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     parsed_args = parse_commandline()
     if parsed_args["decode"]
-        @load parsed_args["model"] model
-        decode(model;  data=parsed_args["data"], fourier=parsed_args["fourier"])
+        decode(parsed_args["model"];  data=parsed_args["data"], fourier=parsed_args["fourier"])
     else
         model = train(; data=parsed_args["data"], fourier=parsed_args["fourier"])
         @save parsed_args["model"] model
