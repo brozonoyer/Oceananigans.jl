@@ -18,7 +18,7 @@ function decode(model_path; kws...)
     end
 
     model = MLP() |> device
-    weights = BSON.load(model_path)
+    weights = BSON.load(model_path, @__MODULE__)
     model = Flux.loadmodel!(model, weights[:model])
 
     ## Create test dataloader
