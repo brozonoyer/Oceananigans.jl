@@ -1,0 +1,66 @@
+{
+    "inputsize": [64, 64, 1],
+    "outputsize": [3844],
+    "layers": [
+       {
+            "layer": "Conv",
+            "filter": [5, 5],
+            "in": 1,
+            "out": 1,
+            "pad": 2,
+            "stride": 1,
+            "dilation": 1,
+            "groups": 1,
+            "activation": "relu",
+            "bias": true
+       },
+       {
+           "layer": "MaxPool",
+           "window": [2, 2],
+           "pad": 0,
+           "stride": [2, 2]
+       },
+       {
+        "layer": "Conv",
+        "filter": [5, 5],
+        "in": 1,
+        "out": 1,
+        "pad": 2,
+        "stride": 1,
+        "dilation": 1,
+        "groups": 1,
+        "activation": "relu",
+        "bias": true
+       },
+       {
+        "layer": "MaxPool",
+        "window": [2, 2],
+        "pad": 0,
+        "stride": [2, 2]
+       },
+       {
+        "layer": "flatten"
+       },
+       {
+        "layer": "Dense",
+        "in": 144,
+        "out": 120,
+        "init": "glorot_uniform",
+        "activation": "relu"
+       },
+       {
+        "layer": "Dense",
+        "in": 120,
+        "out": 84,
+        "init": "glorot_uniform",
+        "activation": "relu"
+       },
+       {
+        "layer": "Dense",
+        "in": 120,
+        "out": 3844,
+        "init": "glorot_uniform",
+        "activation": "relu"
+       }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+ "layers": [
+    {
+        "layer": "Dense",
+        "in": 3600, 
+        "out": 256,
+        "init": "glorot_uniform",
+        "activation": "relu"
+    },
+    {
+        "layer": "Dense",
+        "in": 256,
+        "out": 128,
+        "init": "glorot_uniform",
+        "activation": "relu"
+    },
+    {
+        "layer": "Dense",
+        "in": 128,
+        "out": 3844
+    }
+ ]
+}
