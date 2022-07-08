@@ -21,7 +21,6 @@ function getdata(args)
     ...
     """
     for (timestep, timestep_data) in data
-        print(timestep_data)
         if args.fourier
             RX, ΘX =  VectorPolarFromCartesian(fft(timestep_data[timestep]["rhs"]))  # shape 3600
             push!(X, (RX, ΘX))

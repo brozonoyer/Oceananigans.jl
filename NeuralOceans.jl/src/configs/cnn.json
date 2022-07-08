@@ -25,7 +25,7 @@
         "filter": [5, 5],
         "in": 1,
         "out": 1,
-        "pad": 2,
+        "pad": 0,
         "stride": 1,
         "dilation": 1,
         "groups": 1,
