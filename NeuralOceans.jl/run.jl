@@ -37,7 +37,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     parsed_args = parse_commandline()
     if parsed_args["decode"]
-        decode(parsed_args["model"];  data=parsed_args["data"], fourier=parsed_args["fourier"])
+        decode(parsed_args["model"]; model_config=parsed_args["model_config"], data=parsed_args["data"], fourier=parsed_args["fourier"])
     else
         model = train(; model_config=parsed_args["model_config"], data=parsed_args["data"], fourier=parsed_args["fourier"])
         @save parsed_args["model"] model

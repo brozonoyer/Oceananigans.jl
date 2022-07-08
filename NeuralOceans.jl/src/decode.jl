@@ -17,7 +17,8 @@ function decode(model_path; kws...)
         device = cpu
     end
 
-    model = MLP() |> device
+    # model = MLP() |> device
+    model = load_model_from_json(args.model_config) |> device
     weights = BSON.load(model_path, @__MODULE__)
     model = Flux.loadmodel!(model, weights[:model])
 
