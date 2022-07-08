@@ -18,7 +18,6 @@ function train(; kws...)
     train_loader = getdata(args)
 
     ## Construct model
-    # model = MLP() |> device
     model = load_model_from_json(args.model_config) |> device
     ps = Flux.params(model) ## model's trainable parameters
     

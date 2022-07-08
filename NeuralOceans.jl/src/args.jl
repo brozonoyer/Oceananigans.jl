@@ -9,5 +9,6 @@ using Base: @kwdef
     epochs::Int = 50        ## number of epochs
     use_cuda::Bool = true   ## use gpu (if cuda available)
     fourier::Bool = false  # train model in fourier space
+    cnn_input::Bool = false  ## if training CNN, input data can be 2d, otherwise it is flattened
     decode::Bool = false  # do inference rather than training
 end

@@ -27,6 +27,9 @@ function parse_commandline()
         "--fourier", "-f"
             help = "whether model trains/decodes in fourier space"
             action = :store_true
+        "--cnn_input"
+            help = "if training CNN, input data can be in 2d format, otherwise it is flattened"
+            action = :store_true
     end
 
     return ArgParse.parse_args(s)
@@ -39,7 +42,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if parsed_args["decode"]
         decode(parsed_args["model"]; model_config=parsed_args["model_config"], data=parsed_args["data"], fourier=parsed_args["fourier"])
     else
-        model = train(; model_config=parsed_args["model_config"], data=parsed_args["data"], fourier=parsed_args["fourier"])
+        model = train(; model_config=parsed_args["model_config"], data=parsed_args["data"], cnn_input=parsed_args["cnn_input"], fourier=parsed_args["fourier"])
         @save parsed_args["model"] model
     end
 

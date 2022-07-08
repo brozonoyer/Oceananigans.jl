@@ -21,14 +21,24 @@ function getdata(args)
     ...
     """
     for (timestep, timestep_data) in data
+
         if args.fourier
             RX, ΘX =  VectorPolarFromCartesian(fft(timestep_data[timestep]["rhs"]))  # shape 3600
             push!(X, (RX, ΘX))
-            Ry, Θy = VectorPolarFromCartesian(fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))  # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            if !args.cnn_input
+                Ry, Θy = VectorPolarFromCartesian(fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))  # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            else
+                Ry, Θy = VectorPolarFromCartesian(fft(timestep_data[timestep]["η"]))  # shape (66, 66, 1) assume padding 2 on each side to ignore zeros in input
+            end
             push!(y, (Ry, Θy))
+
         else
             push!(X, timestep_data[timestep]["rhs"])  # shape 3600
-            push!(y, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            if !args.cnn_input
+                push!(y, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+            else
+                push!(y, timestep_data[timestep]["η"]))    # shape (66, 66, 1) assume padding 2 on each side to ignore zeros in input
+            end
         end
     end
     
