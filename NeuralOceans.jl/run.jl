@@ -13,6 +13,10 @@ function parse_commandline()
             help = "path to jld2 in jld2 format"
             arg_type = String
             required = true
+        "--model_config", "-c"
+            help = "model architecture config"
+            arg_type = String
+            required = true
         "--model", "-o"
             help = "path to save model"
             arg_type = String
@@ -25,7 +29,7 @@ function parse_commandline()
             action = :store_true
     end
 
-    return parse_args(s)
+    return ArgParse.parse_args(s)
 end
 
 
@@ -35,7 +39,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if parsed_args["decode"]
         decode(parsed_args["model"];  data=parsed_args["data"], fourier=parsed_args["fourier"])
     else
-        model = train(; data=parsed_args["data"], fourier=parsed_args["fourier"])
+        model = train(; model_config=parsed_args["model_config"], data=parsed_args["data"], fourier=parsed_args["fourier"])
         @save parsed_args["model"] model
     end
 

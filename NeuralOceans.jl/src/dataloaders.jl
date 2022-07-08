@@ -9,7 +9,19 @@ function getdata(args)
 
     X = []
     y = []
+    """
+    data organized by timestep:
+    t1 => (
+        t1 => (
+            rhs => ...  # 3600
+            η => ...    # 66, 66, 1
+        )
+    ),
+    t2 => (...),
+    ...
+    """
     for (timestep, timestep_data) in data
+        print(timestep_data)
         if args.fourier
             RX, ΘX =  VectorPolarFromCartesian(fft(timestep_data[timestep]["rhs"]))  # shape 3600
             push!(X, (RX, ΘX))
