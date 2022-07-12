@@ -23,16 +23,23 @@ function decode(model_path; kws...)
     model = Flux.loadmodel!(model, weights[:model])
 
     ## Create test dataloader
-    test_loader = getdata(args)
+    if args.fourier
+        test_R_loader, test_Θ_loader = getdata(args)
+        test_loader = zip(test_R_loader, test_Θ_loader)
+    else
+        test_loader = getdata(args)
+    end
 
     Ŷ = []
-    for (x, y) in test_loader
+    for batch in test_loader
         if args.fourier
-            Rx, Θx = device(x[1][1]), device(x[1][2])
+            ((Rx, Ry), (Θx, Θy)) = batch
+            Rx, Θx = device(Rx), device(Θx)
             Rŷ, Θŷ = model(Rx), model(Θx)
             push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
         else
-	    ŷ = model(device(x[1]))
+	    (x, y) = batch
+	    ŷ = model(device(x))
             push!(Ŷ, ŷ)
         end
     end

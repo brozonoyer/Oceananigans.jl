@@ -15,7 +15,12 @@ function train(; kws...)
     end
 
     ## Create train dataloader
-    train_loader = getdata(args)
+    if args.fourier
+        train_R_loader, train_Θ_loader = getdata(args)
+	train_loader = zip(train_R_loader, train_Θ_loader)
+    else
+        train_loader = getdata(args)
+    end
 
     ## Construct model
     model = load_model_from_json(args.model_config) |> device
@@ -26,12 +31,14 @@ function train(; kws...)
     
     ## Training
     for epoch in 1:args.epochs
-        for (x, y) in train_loader
-            if !args.fourier
-                x, y = device(x[1]), device(y[1]) ## transfer data to device
+        for batch in train_loader
+	    if !args.fourier
+                (x, y) = batch
+	        x, y = device(x), device(y) ## transfer data to device
                 gs = gradient(() -> logitcrossentropy(model(x), y), ps) ## compute gradient
             else
-                Rx, Θx, Ry, Θy = device(x[1][1]), device(x[1][2]), device(y[1][1]), device(y[1][2])
+                ((Rx, Ry), (Θx, Θy)) = batch
+	        Rx, Ry, Θx, Θy = device(Rx), device(Ry), device(Θx), device(Θy)
                 gs = gradient(() -> logitcrossentropy(model(Rx), Ry) + logitcrossentropy(model(Θx), Θy), ps) ## compute gradient
             end
             Flux.Optimise.update!(opt, ps, gs) ## update parameters

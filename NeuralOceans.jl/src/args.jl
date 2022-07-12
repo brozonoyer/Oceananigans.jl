@@ -5,7 +5,7 @@ using Base: @kwdef
     model_config::String = "/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans/jl/src/configs/mlp.config"  ## path to json model config
     data::String = "/nfs/nimble/users/brozonoy/Oceananigans.jl/tdata.jld2"      ## path to jld2 data file
     η::Float64 = 3e-4       ## learning rate
-    batchsize::Int = 1    ## batch size
+    batchsize::Int = 6    ## batch size
     epochs::Int = 50        ## number of epochs
     use_cuda::Bool = true   ## use gpu (if cuda available)
     fourier::Bool = false  # train model in fourier space
