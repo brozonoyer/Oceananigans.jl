@@ -1,4 +1,4 @@
-using Flux.Losses: logitcrossentropy
+using Flux.Losses: logitcrossentropy, mse
 
 
 function loss(data_loader, model, device; fourier=false)
@@ -9,13 +9,15 @@ function loss(data_loader, model, device; fourier=false)
 	    (x, y) = batch
             x, y = device(x), device(y)
             ŷ = model(x)
-            ls += logitcrossentropy(ŷ, y, agg=sum)
+            # ls += logitcrossentropy(ŷ, y, agg=sum)
+            ls += mse(ŷ, y, agg=sum)
             num +=  size(x)[end]
         else
             ((Rx, Ry), (Θx, Θy)) = batch
             Rx, Ry, Θx, Θy = device(Rx), device(Ry), device(Θx), device(Θy)
             Rŷ, Θŷ = model(Rx), model(Θx)
-            ls += (logitcrossentropy(Rŷ, Ry, agg=sum) + logitcrossentropy(Θŷ, Θy, agg=sum))
+            # ls += (logitcrossentropy(Rŷ, Ry, agg=sum) + logitcrossentropy(Θŷ, Θy, agg=sum))
+            ls += (mse(Rŷ, Ry, agg=sum) + mse(Θŷ, Θy, agg=sum))
             num +=  2*size(Rx)[end]
         end
     end

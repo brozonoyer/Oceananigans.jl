@@ -6,7 +6,7 @@ using Base: @kwdef
     data::String = "/nfs/nimble/users/brozonoy/Oceananigans.jl/tdata.jld2"      ## path to jld2 data file
     η::Float64 = 3e-4       ## learning rate
     batchsize::Int = 6    ## batch size
-    epochs::Int = 50        ## number of epochs
+    epochs::Int = 500        ## number of epochs
     use_cuda::Bool = true   ## use gpu (if cuda available)
     fourier::Bool = false  # train model in fourier space
     cnn_input::Bool = false  ## if training CNN, input data can be 2d, otherwise it is flattened

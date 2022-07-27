@@ -72,7 +72,7 @@ function getdata(args)
     ## Create DataLoader object(s) (mini-batch iterator)
     if args.fourier
         R_loader = DataLoader((data=RX, label=Ry), batchsize=args.batchsize, shuffle=!args.decode)
-	Θ_loader = DataLoader((data=ΘX, label=Θy), batchsize=args.batchsize, shuffle=!args.decode)
+	    Θ_loader = DataLoader((data=ΘX, label=Θy), batchsize=args.batchsize, shuffle=!args.decode)
         return R_loader, Θ_loader
     else
         loader = DataLoader((data=X, label=y), batchsize=args.batchsize, shuffle=!args.decode)
