@@ -8,12 +8,11 @@ function getdata(args)
     data = load(args.data)
 
     if args.fourier
-        RX_list, Ry_list = [], []
-        ΘX_list, Θy_list = [], []
+        RX_list, ΘX_list = [], []
     else
         X_list = []
-        y_list = []
     end
+    y_list = []
     """
     data organized by timestep:
     t1 => (
@@ -31,17 +30,16 @@ function getdata(args)
 
             ## fourier input
             if !args.cnn_input
-                RX_instance, ΘX_instance =  VectorPolarFromCartesian(fft(timestep_data[timestep]["rhs"]))  # shape 3600
+                rhs = timestep_data[timestep]["rhs"]  # right hand side for timestep, shape 3600
+                rhs = reshape(fft(reshape(rhs, (60, 60)), (1,2)), 3600)  # perform 2d FFT and reshape back to original shape 3600
+                RX_instance, ΘX_instance = VectorPolarFromCartesian(rhs)  # shape 3600
             else
-                RX_instance, ΘX_instance =  VectorPolarFromCartesian(fft(reshape(timestep_data[timestep]["rhs"], (60, 60, 1))))  # shape (60, 60, 1)
+                rhs = timestep_data[timestep]["rhs"]  # right hand side for timestep, shape 3600
+                rhs = fft(reshape(rhs, (60, 60, 1)), (1,2))  # perform 2d FFT
+                RX_instance, ΘX_instance = VectorPolarFromCartesian(rhs)  # shape (60, 60, 1)
             end
             push!(RX_list, RX_instance)
             push!(ΘX_list, ΘX_instance)
-
-            ## fourier output
-            Ry_instance, Θy_instance = VectorPolarFromCartesian(fft(reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))))  # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-            push!(Ry_list, Ry_instance)
-            push!(Θy_list, Θy_instance)
 
         else
 
@@ -52,27 +50,28 @@ function getdata(args)
                 push!(X_list, reshape(timestep_data[timestep]["rhs"], (60, 60, 1)))  # shape (60, 60, 1)
             end
 
-            ## non-fourier output
-            push!(y_list, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-
         end
+
+        ## output
+        push!(y_list, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
+
     end
 
     ## Concatenate all samples
     if args.fourier
         RX = args.cnn_input ? cat(RX_list...; dims=4) : cat(RX_list...; dims=2)
-        Ry = cat(Ry_list...; dims=2)
+        # Ry = cat(Ry_list...; dims=2)
         ΘX = args.cnn_input ? cat(ΘX_list...; dims=4) : cat(ΘX_list...; dims=2)
-        Θy = cat(Θy_list...; dims=2)
+        # Θy = cat(Θy_list...; dims=2)
     else
         X = args.cnn_input ? cat(X_list...; dims=4) : cat(X_list...; dims=2)
-        y = cat(y_list...; dims=2)
     end
+    y = cat(y_list...; dims=2)
 
     ## Create DataLoader object(s) (mini-batch iterator)
     if args.fourier
-        R_loader = DataLoader((data=RX, label=Ry), batchsize=args.batchsize, shuffle=!args.decode)
-	    Θ_loader = DataLoader((data=ΘX, label=Θy), batchsize=args.batchsize, shuffle=!args.decode)
+        R_loader = DataLoader((data=RX, label=y), batchsize=args.batchsize, shuffle=!args.decode)
+	    Θ_loader = DataLoader((data=ΘX, label=y), batchsize=args.batchsize, shuffle=!args.decode)
         return R_loader, Θ_loader
     else
         loader = DataLoader((data=X, label=y), batchsize=args.batchsize, shuffle=!args.decode)
