@@ -7,12 +7,13 @@ function getdata(args)
 
     data = load(args.data)
 
+    timestep_list = []
     if args.fourier
         RX_list, ΘX_list = [], []
     else
         X_list = []
     end
-    y_list = []
+    Ry_fourier_list, Θy_fourier_list, y_list = [], [], []  # training y in polar fourier, testing y in original cartesian space
     """
     data organized by timestep:
     t1 => (
@@ -25,6 +26,9 @@ function getdata(args)
     ...
     """
     for (timestep, timestep_data) in data
+
+        # record timestep
+        push!(timestep_list, timestep)
 
         if args.fourier
 
@@ -40,6 +44,13 @@ function getdata(args)
             end
             push!(RX_list, RX_instance)
             push!(ΘX_list, ΘX_instance)
+
+            ## fourier-space output (for training only, use cartesian-space y for testing)
+            η_instance = reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))
+            η_fourier_instance = fft(η_instance, 1)
+            Ry_fourier_instance, Θy_fourier_instance = VectorPolarFromCartesian(η_fourier_instance)  ## use just for training in fourier space
+            push!(Ry_fourier_list, Ry_fourier_instance)
+            push!(Θy_fourier_list, Θy_fourier_instance)
 
         else
 
@@ -60,9 +71,9 @@ function getdata(args)
     ## Concatenate all samples
     if args.fourier
         RX = args.cnn_input ? cat(RX_list...; dims=4) : cat(RX_list...; dims=2)
-        # Ry = cat(Ry_list...; dims=2)
+        Ry_fourier = cat(Ry_fourier_list...; dims=2)
         ΘX = args.cnn_input ? cat(ΘX_list...; dims=4) : cat(ΘX_list...; dims=2)
-        # Θy = cat(Θy_list...; dims=2)
+        Θy_fourier = cat(Θy_fourier_list...; dims=2)
     else
         X = args.cnn_input ? cat(X_list...; dims=4) : cat(X_list...; dims=2)
     end
@@ -70,11 +81,11 @@ function getdata(args)
 
     ## Create DataLoader object(s) (mini-batch iterator)
     if args.fourier
-        R_loader = DataLoader((data=RX, label=y), batchsize=args.batchsize, shuffle=!args.decode)
-	    Θ_loader = DataLoader((data=ΘX, label=y), batchsize=args.batchsize, shuffle=!args.decode)
+        R_loader = DataLoader((data=RX, label=y, Ry_fourier=Ry_fourier, Θy_fourier=Θy_fourier, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
+	    Θ_loader = DataLoader((data=ΘX,), batchsize=args.batchsize, shuffle=!args.decode)
         return R_loader, Θ_loader
     else
-        loader = DataLoader((data=X, label=y), batchsize=args.batchsize, shuffle=!args.decode)
+        loader = DataLoader((data=X, label=y, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
         return loader
     end
     

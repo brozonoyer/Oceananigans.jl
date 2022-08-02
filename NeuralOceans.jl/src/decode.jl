@@ -30,19 +30,24 @@ function decode(model_path; kws...)
         test_loader = getdata(args)
     end
 
-    Ŷ = []
+    η_per_timestep = Dict()
     for batch in test_loader
         if args.fourier
             ((Rx, Ry), (Θx, Θy)) = batch
             Rx, Θx = device(Rx), device(Θx)
             Rŷ, Θŷ = model(Rx), model(Θx)
-            push!(Ŷ, ifft(VectorCartesianFromPolar(Rŷ, Θŷ)))
+            η_per_timestep[timestep] = ifft(VectorCartesianFromPolar(Rŷ, Θŷ))
         else
-	    (x, y) = batch
-	    ŷ = model(device(x))
-            push!(Ŷ, ŷ)
+            (x, y, timestep) = batch
+            ŷ = model(device(x))
+            η_per_timestep[timestep] = ŷ
         end
     end
 
-    return Ŷ
+    # save η_per_timestep to JLD2 file
+    println("Saving to ", "/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans.jl/predictions/η_per_timestep.jld2")
+    @save "/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans.jl/predictions/η_per_timestep.jld2" η_per_timestep
+
+    return η_per_timestep
+
 end

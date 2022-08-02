@@ -31,27 +31,40 @@ function train(; kws...)
     opt = ADAM(args.η)
     
     epoch_list, loss_list = [], []
-    η_per_timestep = Dict()
+
     ## Training
     for epoch in 1:args.epochs
         for batch in train_loader
 	        if !args.fourier
-                (x, y) = batch
+                (x, y, timestep) = batch
 	            x, y = device(x), device(y)
                 gs = gradient(() -> mse(model(x), y), ps)   ## compute gradient
             else
-                ((Rx, y), (Θx, _)) = batch
-	            Rx, Θx = device(Rx), device(Θx)
+                ((Rx, y, Ry_fourier, Θy_fourier, timestep), (Θx,)) = batch
+	            Rx, Θx, Ry_fourier, Θy_fourier = device(Rx), device(Θx), device(Ry_fourier), device(Θy_fourier)
                 Rŷ, Θŷ = model(Rx), model(Θx)
-                ŷ = VectorCartesianFromPolar(Rŷ, Θŷ)        # convert to Cartesian coors in Fourier space
-                ŷ = reshape(ŷ, (62, 62, args.batchsize))    # reshape to square grid
-                ŷ = ifft(ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
-                ŷ = reshape(ŷ, (3844, args.batchsize))      # reshape back into vector
-                gs = gradient(() -> mse(ŷ, y), ps)          ## compute gradient
+
+                ### COMPUTATION OF LOSS IN ORIGINAL (NON-FOURIER) GRID-POINT CARTESIAN SPACE
+                #
+                # ŷ = VectorCartesianFromPolar(Rŷ, Θŷ)        # convert to Cartesian coors in Fourier space
+                # ŷ = reshape(ŷ, (62, 62, args.batchsize))    # reshape to square grid
+                # ŷ = ifft(ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
+                # ŷ = reshape(ŷ, (3844, args.batchsize))      # reshape back into vector
+                # gs = gradient(() -> mse(ŷ, y), ps)          ## compute gradient
+                #
+
+                # println("size(timestep)", size(timestep))
+                # println("size(Rŷ): ", size(Rŷ))
+                # println("size(Ry_fourier): ", size(Ry_fourier))
+                # println("size(Θŷ): ", size(Θŷ))
+                # println("size(Θy_fourier): ", size(Θy_fourier))
+
+                gs = gradient(() -> mse(Rŷ, Ry_fourier) + mse(Θŷ, Θy_fourier), ps) ## compute gradient
             end
             Flux.Optimise.update!(opt, ps, gs) ## update parameters
         end
         ## Report on train and test
+        ## TODO compute test loss for display in original space (non-Fourier Cartesian)
         train_loss = loss(train_loader, model, device, args; fourier=args.fourier)
         println("Epoch=$epoch")
         push!(epoch_list, epoch)
