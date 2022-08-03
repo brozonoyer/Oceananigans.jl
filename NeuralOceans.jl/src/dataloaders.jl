@@ -6,14 +6,6 @@ using Flux.Data: DataLoader
 function getdata(args)
 
     data = load(args.data)
-
-    timestep_list = []
-    if args.fourier
-        RX_list, ΘX_list = [], []
-    else
-        X_list = []
-    end
-    Ry_fourier_list, Θy_fourier_list, y_list = [], [], []  # training y in polar fourier, testing y in original cartesian space
     """
     data organized by timestep:
     t1 => (
@@ -25,68 +17,75 @@ function getdata(args)
     t2 => (...),
     ...
     """
+
+    timestep_list, X, Y = [], [], []   # timesteps, RHS, \Eta
+
+    ### FIRST PASS: COLLECT RAW DATA PER TIMESTEP
     for (timestep, timestep_data) in data
 
-        # record timestep
-        push!(timestep_list, timestep)
+        push!(timestep_list, timestep)                                             # timestep: ℤ
+        push!(X, reshape(timestep_data[timestep]["rhs"], (60, 60, 1)))             # rhs:      3600 -> (60, 60, 1)
+        push!(Y, timestep_data[timestep]["η"][3:64, 3:64])                         # η:        (62, 62)
 
+    end
+
+    ### DO FOURIER AND CARTESIAN->POLAR CONVERSIONS
+    if args.fourier
+
+        ### SECOND PASS: APPLY FFT
+        X_Fourier = map(rhs->fft(rhs, (1,2)), X)
+        Y_Fourier = map(η->fft(η, (1,2)), Y)
+
+        ### THIRD PASS: FOURIER CARTESIAN TO FOURIER POLAR
+        X_Polar = map(rhs->VectorPolarFromCartesian(rhs), X_Fourier)      # [(XR,XΘ),...]
+        Y_Polar = map(η->VectorPolarFromCartesian(η), Y_Fourier)          # [(YR,YΘ),...]
+
+        XR = map(tup->tup[1], X_Polar)    # [XR,...]
+        XΘ = map(tup->tup[2], X_Polar)    # [XΘ,...]
+
+        YR = map(tup->tup[1], Y_Polar)    # [YR,...]
+        YΘ = map(tup->tup[2], Y_Polar)    # [YΘ,...]
+
+    end
+
+    ### IF TRAINING MLP, EACH INSTANCE OF INPUT X SHOULD BE FLATTENED FROM (60,60,1) TO (3600,)
+    if !args.cnn_input
+        X = map(rhs->reshape(rhs, (60*60,)), X)
         if args.fourier
-
-            ## fourier input
-            if !args.cnn_input
-                rhs = timestep_data[timestep]["rhs"]  # right hand side for timestep, shape 3600
-                rhs = reshape(fft(reshape(rhs, (60, 60)), (1,2)), 3600)  # perform 2d FFT and reshape back to original shape 3600
-                RX_instance, ΘX_instance = VectorPolarFromCartesian(rhs)  # shape 3600
-            else
-                rhs = timestep_data[timestep]["rhs"]  # right hand side for timestep, shape 3600
-                rhs = fft(reshape(rhs, (60, 60, 1)), (1,2))  # perform 2d FFT
-                RX_instance, ΘX_instance = VectorPolarFromCartesian(rhs)  # shape (60, 60, 1)
-            end
-            push!(RX_list, RX_instance)
-            push!(ΘX_list, ΘX_instance)
-
-            ## fourier-space output (for training only, use cartesian-space y for testing)
-            η_instance = reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,))
-            η_fourier_instance = fft(η_instance, 1)
-            Ry_fourier_instance, Θy_fourier_instance = VectorPolarFromCartesian(η_fourier_instance)  ## use just for training in fourier space
-            push!(Ry_fourier_list, Ry_fourier_instance)
-            push!(Θy_fourier_list, Θy_fourier_instance)
-
-        else
-
-            ## non-fourier input
-            if !args.cnn_input
-                push!(X_list, timestep_data[timestep]["rhs"])  # shape 3600
-            else
-                push!(X_list, reshape(timestep_data[timestep]["rhs"], (60, 60, 1)))  # shape (60, 60, 1)
-            end
-
+            XR = map(rhs->reshape(rhs, (60*60,)), XR)
+            XΘ = map(rhs->reshape(rhs, (60*60,)), XΘ)
         end
-
-        ## output
-        push!(y_list, reshape(timestep_data[timestep]["η"][3:64, 3:64], (62*62,)))    # shape (66, 66, 1) -> (62, 62, 1) -> 62*62=3844 strip away zeros and flatten
-
+    end
+    ### EACH INSTANCE OF OUTPUT Y SHOULD BE FLATTENED FOR DENSE PREDICTION LAYER
+    Y = map(η->reshape(η, (62*62,)), Y)             # cartesian non-fourier
+    if args.fourier
+        Y_Fourier = map(η->reshape(η, (62*62,)), Y_Fourier)     # cartesian fourier
+        YR =        map(η->reshape(η, (62*62,)), YR)            # polar fourier magnitude
+        YΘ =        map(η->reshape(η, (62*62,)), YΘ)            # polar fourier phase
     end
 
-    ## Concatenate all samples
-    if args.fourier
-        RX = args.cnn_input ? cat(RX_list...; dims=4) : cat(RX_list...; dims=2)
-        Ry_fourier = cat(Ry_fourier_list...; dims=2)
-        ΘX = args.cnn_input ? cat(ΘX_list...; dims=4) : cat(ΘX_list...; dims=2)
-        Θy_fourier = cat(Θy_fourier_list...; dims=2)
+    ### CONCATENATE ALL SAMPLES
+    ### MLP
+    if !args.fourier
+        X = args.cnn_input ? cat(X...; dims=4) : cat(X...; dims=2)
+    ### CNN
     else
-        X = args.cnn_input ? cat(X_list...; dims=4) : cat(X_list...; dims=2)
+        ### POLAR DATA IS IN FOURIER SPACE
+        XR = args.cnn_input ? cat(XR...; dims=4) : cat(XR...; dims=2)
+        XΘ = args.cnn_input ? cat(XΘ...; dims=4) : cat(XΘ...; dims=2)
+        YR = cat(YR...; dims=2)
+        YΘ = cat(YΘ...; dims=2)
     end
-    y = cat(y_list...; dims=2)
+    Y = cat(Y...; dims=2)
 
-    ## Create DataLoader object(s) (mini-batch iterator)
-    if args.fourier
-        R_loader = DataLoader((data=RX, label=y, Ry_fourier=Ry_fourier, Θy_fourier=Θy_fourier, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
-	    Θ_loader = DataLoader((data=ΘX,), batchsize=args.batchsize, shuffle=!args.decode)
-        return R_loader, Θ_loader
-    else
-        loader = DataLoader((data=X, label=y, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
+    ### CREATE DATALOADER OBJECT(S) (MINI-BATCH ITERATOR)
+    if !args.fourier
+        loader = DataLoader((data=X, Y=Y, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
         return loader
+    else
+        R_loader = DataLoader((data=XR, Y=Y, YR=YR, YΘ=YΘ, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
+	    Θ_loader = DataLoader((data=XΘ,), batchsize=args.batchsize, shuffle=!args.decode)
+        return R_loader, Θ_loader
     end
     
 end
