@@ -78,13 +78,18 @@ function getdata(args)
     end
     Y = cat(Y...; dims=2)
 
+    fourier_str = args.fourier ? "fourier-" : ""
+    model_str = args.cnn_input ? "cnn" : "mlp"
+
     ### CREATE DATALOADER OBJECT(S) (MINI-BATCH ITERATOR)
     if !args.fourier
         loader = DataLoader((data=X, Y=Y, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
+        FileIO.save("/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans.jl/jld2/$fourier_str$model_str.jld2", Dict("X"=>X, "Y"=>Y,))
         return loader
     else
         R_loader = DataLoader((data=XR, Y=Y, YR=YR, YΘ=YΘ, timestep=timestep_list), batchsize=args.batchsize, shuffle=!args.decode)
 	    Θ_loader = DataLoader((data=XΘ,), batchsize=args.batchsize, shuffle=!args.decode)
+        FileIO.save("/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans.jl/jld2/$fourier_str$model_str.jld2", Dict("XR"=>XR, "XΘ"=>XΘ, "Y"=>Y, "YR"=>YR, "YΘ"=>YΘ))
         return R_loader, Θ_loader
     end
     
