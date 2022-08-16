@@ -6,29 +6,29 @@ function loss(data_loader, model, device, args; fourier=false)
     num = 0
     for batch in data_loader
         if !fourier
-	        (x, y) = batch
-            x, y = device(x), device(y)
-            ŷ = model(x)
-            ls += mse(ŷ, y, agg=sum)
-            num += size(x)[end]
+	        (X, Y) = batch
+            X, Y = device(X), device(Y)
+            Ŷ = model(X)
+            ls += mse(Ŷ, Y, agg=sum)
+            num += size(X)[end]
         else
-            ((Rx, y, Ry_fourier, Θy_fourier, timestep), (Θx,)) = batch
-            Rx, Θx, Ry_fourier, Θy_fourier = device(Rx), device(Θx), device(Ry_fourier), device(Θy_fourier)
-            Rŷ, Θŷ = model(Rx), model(Θx)
+            (XR, Y, YR, YΘ, timestep_list), (XΘ,) = batch
+            XR, XΘ, YR, YΘ = device(XR), device(XΘ), device(YR), device(YΘ)
+            ŶR, ŶΘ = model(XR), model(XΘ)
 
             ### COMPUTATION OF LOSS IN FOURIER POLAR SPACE
-            # ls += mse(Rŷ, Ry_fourier) + mse(Θŷ, Θy_fourier)
+            # ls += mse(ŶR, YR) + mse(ŶΘ, YΘ)
 
             ### COMPUTATION OF LOSS IN ORIGINAL (NON-FOURIER) GRID-POINT CARTESIAN SPACE
             
-            ŷ = VectorCartesianFromPolar(Rŷ, Θŷ)        # convert to Cartesian coors in Fourier space
-            ŷ = reshape(ŷ, (62, 62, args.batchsize))    # reshape to square grid
-            ŷ = ifft(ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
-            ŷ = reshape(ŷ, (3844, args.batchsize))      # reshape back into vector
+            Ŷ = VectorCartesianFromPolar(ŶR, ŶΘ)        # convert to Cartesian coors in Fourier space
+            Ŷ = reshape(Ŷ, (62, 62, args.batchsize))    # reshape to square grid
+            Ŷ = ifft(Ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
+            Ŷ = reshape(Ŷ, (3844, args.batchsize))      # reshape back into vector
             
-            ls += mse(ŷ, y, agg=sum)
+            ls += mse(Ŷ, Y, agg=sum)
             
-            num += size(Rx)[end]
+            num += size(XR)[end]
 
         end
     end

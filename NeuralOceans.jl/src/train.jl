@@ -1,6 +1,12 @@
 using CUDA
 using FFTW
 using Plots
+using Flux
+using CSV
+using DataFrames
+using Random
+using Statistics
+
 
 function train(; kws...)
 
@@ -39,27 +45,63 @@ function train(; kws...)
                 (x, y, timestep) = batch
 	            x, y = device(x), device(y)
                 gs = gradient(() -> mse(model(x), y), ps)   ## compute gradient
-            else
-                ((Rx, y, Ry_fourier, Θy_fourier, timestep), (Θx,)) = batch
-	            Rx, Θx, Ry_fourier, Θy_fourier = device(Rx), device(Θx), device(Ry_fourier), device(Θy_fourier)
-                Rŷ, Θŷ = model(Rx), model(Θx)
 
-                ### COMPUTATION OF LOSS IN ORIGINAL (NON-FOURIER) GRID-POINT CARTESIAN SPACE
+                ### PRINT INFO ABOUT GRADIENTS
+                gs_list = [gs[p] for p in ps]
+                for g in gs_list
+                    println(typeof(g))
+                    # g_vec = vec(g)
+                    # std = Statistics.std(g_vec)
+                    # mean = Statistics.mean(g_vec)
+                    # println("std = ", std)
+                    # println("mean = ", mean)
+                end
+
+
+            else
+                (XR, Y, YR, YΘ, timestep_list), (XΘ,) = batch
+	            XR, XΘ, YR, YΘ = device(XR), device(XΘ), device(YR), device(YΘ) 
+                ŶR, ŶΘ = model(XR), model(XΘ)
+
+                ### COMPUTATION OF LOSS IN ORIGINAL (NON-FOURIER) GRID-POINT CARTESIAN SPACE [TOO SLOW]
                 #
-                # ŷ = VectorCartesianFromPolar(Rŷ, Θŷ)        # convert to Cartesian coors in Fourier space
-                # ŷ = reshape(ŷ, (62, 62, args.batchsize))    # reshape to square grid
-                # ŷ = ifft(ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
-                # ŷ = reshape(ŷ, (3844, args.batchsize))      # reshape back into vector
-                # gs = gradient(() -> mse(ŷ, y), ps)          ## compute gradient
+                # Ŷ = VectorCartesianFromPolar(ŶR, ŶΘ)        # convert to Cartesian coors in Fourier space
+                # Ŷ = reshape(Ŷ, (62, 62, args.batchsize))    # reshape to square grid
+                # Ŷ = ifft(Ŷ, (1,2))                          # inverse fast fourier transform to compare against non-Fourier, Cartesian y
+                # Ŷ = reshape(Ŷ, (3844, args.batchsize))      # reshape back into vector
+                # gs = gradient(() -> mse(Ŷ, Y), ps)          ## compute gradient
                 #
 
                 # println("size(timestep)", size(timestep))
-                # println("size(Rŷ): ", size(Rŷ))
-                # println("size(Ry_fourier): ", size(Ry_fourier))
-                # println("size(Θŷ): ", size(Θŷ))
-                # println("size(Θy_fourier): ", size(Θy_fourier))
+                # println("size(ŶR): ", size(ŶR))
+                # println("size(YR): ", size(YR))
+                # println("size(ŶΘ): ", size(ŶΘ))
+                # println("size(YΘ): ", size(YΘ))
 
-                gs = gradient(() -> mse(Rŷ, Ry_fourier) + mse(Θŷ, Θy_fourier), ps) ## compute gradient
+                # noise = device(rand(Float64, size(ŶR)))
+                # gs = Flux.gradient(() -> mse(ŶR, ŶR + noise), ps)# + mse(ŶΘ, YΘ), ps) ## compute gradient
+
+                # gs = Flux.gradient(() -> device(rand(Float64)), ps)# + mse(ŶΘ, YΘ), ps) ## compute gradient
+
+                gs = Flux.gradient(() -> mse(ŶR, YR), ps)# + mse(ŶΘ, YΘ), ps) ## compute gradient
+                
+                ### SERIALIZE FLATTENED PARAMS TO CSV FILE TO SEE IF THEY'RE BEING UPDATED              
+                # println(gs.grads)
+                # for (i, p) in enumerate(ps)
+                #     df = DataFrame(vec(Array(p))', :auto)  # flatten params to vector and transpose to row
+                #     CSV.write("/nfs/nimble/users/brozonoy/Oceananigans.jl/NeuralOceans.jl/csvs/ps_$i.csv", df, delim = ',',append=true)
+                # end
+
+                ### PRINT INFO ABOUT GRADIENTS
+                gs_list = [gs[p] for p in ps]
+                for g in gs_list
+                    println(typeof(g))
+                    # g_vec = vec(g)
+                    # std = Statistics.std(g_vec)
+                    # mean = Statistics.mean(g_vec)
+                    # println("std = ", std)
+                    # println("mean = ", mean)
+                end
             end
             Flux.Optimise.update!(opt, ps, gs) ## update parameters
         end
