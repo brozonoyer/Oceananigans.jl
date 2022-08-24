@@ -1,4 +1,5 @@
 using Flux, JSON
+using NeuralOperators
 
 
 # https://fluxml.ai/Flux.jl/stable/models/nnlib/
@@ -157,6 +158,11 @@ function max_pool_layer_from_config(layer_config::Dict)
 end
 
 
+function fourier_operator_layer_from_config(layer_config::Dict)
+    return nothing
+end
+
+
 function MLP(; inputsize=(3600,1))
     """
     https://github.com/FluxML/model-zoo/blob/master/vision/mlp_mnist/mlp_mnist.jl
@@ -166,6 +172,32 @@ function MLP(; inputsize=(3600,1))
                 Dense(256, 62*62))
 end
 
+
+function FourierNeuralOperator()
+    
+    # return NeuralOperators.FourierNeuralOperator(;
+    #                   ch = (3600, 64, 64, 64, 64, 64, 128, 62*62),
+    #                   modes = (16, ),
+    #                   σ = Flux.gelu
+    # )
+
+    modes = (16, )
+    ch = 64 => 64
+    σ = Flux.gelu
+
+    return Chain(
+        # # operator projects data between infinite-dimensional spaces
+        OperatorKernel(60 => 60, (16, ), FourierTransform, Flux.gelu, permuted=false),
+        # FourierOperator(ch, modes, σ),
+        # FourierOperator(ch, modes, σ),
+        # FourierOperator(ch, modes),
+        # # project infinite-dimensional function to finite-dimensional space
+        Dense(60, 128, σ),
+        Dense(128, 62*62)#,
+        # flatten
+    )
+
+end
 
 function CNN(; inputsize=(60,60,1), outputsize=62*62) 
     """
