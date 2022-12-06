@@ -130,6 +130,17 @@ function implicit_free_surface_step!(free_surface::ImplicitFreeSurface, model, �
     curt=model.clock.time
     fld_dict=Dict("η" => η.data.parent,"rhs" => rhs)
     d_record=Dict(string(curt) => fld_dict )
+
+    open("rhs.txt", "a") do io
+        print(io, rhs)
+        print(io, "\n")
+    end
+
+    open("eta.txt", "a") do io
+        print(io, η.data.parent)
+        print(io, "\n")
+    end
+    
     jldopen("tdata.jld2", "a+") do file
         file[string(curt)] = d_record
     end
