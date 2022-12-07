@@ -117,8 +117,8 @@ end
 
 simulation = Simulation(model,
                         Δt = 3600,
-                        stop_time = 1day)
-#                       stop_time = 1years)
+#                        stop_time = 1day)
+                       stop_time = 1years)
 
 simulation.callbacks[:progress] = Callback(Progress(time_ns()), IterationInterval(20))
 
@@ -132,6 +132,15 @@ simulation.output_writers[:fields] = JLD2OutputWriter(model, output_fields,
                                                       overwrite_existing = true)
 
 save("tdata.jld2",Dict())
+
+# Create empty rhs.txt and eta.txt files for the simulation to fill in later
+open("rhs.txt", "w") do io
+    print(io, "")
+end
+
+open("eta.txt", "w") do io
+    print(io, "")
+end
 
 run!(simulation)
 
